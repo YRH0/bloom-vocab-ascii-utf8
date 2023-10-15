@@ -42,7 +42,6 @@ def _convert_id_to_token(self, index):
 def convert_tokens_to_string(byte_decoder, tokens):
     """Converts a sequence of tokens (string) in a single string."""
     text = "".join(tokens)
-    print(text)
     text_utf = bytearray([byte_decoder[c] for c in text]).decode("utf-8", 'ignore')
     return text_utf
 
@@ -51,14 +50,17 @@ from transformers import BloomTokenizerFast
 byte_encoder = bytes_to_unicode()
 byte_decoder = {v: k for k, v in byte_encoder.items()}
 tokenizer = BloomTokenizerFast.from_pretrained("bloom-560m")
-seg_id =  tokenizer("海运业雄踞全球之首，按吨位计占世界总数的１７％。")["input_ids"]
-
 utf_vocab = {}
+seg_sen = []
 for key,value in tokenizer.vocab.items():
     key_unicode = convert_tokens_to_string(byte_decoder, key)
     utf_vocab[str(value)] = key_unicode
+with open("msr_test.utf8", "r", encoding="utf-8") as f:
+    zh_valid = f.readlines()
 
-seg_id_ = "  ".join([utf_vocab[str(j)] for j in seg_id])
-with open("tokenizer-unicode.json","w") as f:
-    json.dump(utf_vocab,f, ensure_ascii=False)
+seg_id =  [tokenizer(i)["input_ids"] for i in zh_valid]
+for id in seg_id:
+    seg_sen.append("  ".join([utf_vocab[str(j)] for j in id]))
 
+with open("seg_sen.txt", "w", encoding="utf-8") as f:
+    f.writelines(seg_sen)

@@ -1,5 +1,8 @@
 import json
 import re
+import thulac   
+import pynlpir
+
 def bytes_to_unicode():
     """
     Returns list of utf-8 byte and a corresponding list of unicode strings.
@@ -42,23 +45,61 @@ def _convert_id_to_token(self, index):
 def convert_tokens_to_string(byte_decoder, tokens):
     """Converts a sequence of tokens (string) in a single string."""
     text = "".join(tokens)
-    print(text)
     text_utf = bytearray([byte_decoder[c] for c in text]).decode("utf-8", 'ignore')
     return text_utf
 
 from transformers import BloomTokenizerFast
+import jieba
 
 byte_encoder = bytes_to_unicode()
 byte_decoder = {v: k for k, v in byte_encoder.items()}
 tokenizer = BloomTokenizerFast.from_pretrained("bloom-560m")
-seg_id =  tokenizer("海运业雄踞全球之首，按吨位计占世界总数的１７％。")["input_ids"]
-
 utf_vocab = {}
 for key,value in tokenizer.vocab.items():
     key_unicode = convert_tokens_to_string(byte_decoder, key)
     utf_vocab[str(value)] = key_unicode
+seg_sen = []
+with open("msr_test.utf8", "r", encoding="utf-8") as f:
+    zh_valid = f.readlines()
+seg_id =  [tokenizer(i.strip())["input_ids"] for i in zh_valid]
+for id in seg_id:
+    seg_sen.append([utf_vocab[str(j)] for j in id])
 
-seg_id_ = "  ".join([utf_vocab[str(j)] for j in seg_id])
-with open("tokenizer-unicode.json","w") as f:
-    json.dump(utf_vocab,f, ensure_ascii=False)
 
+with open("msr-test-gold-low.utf8", "r", encoding="utf-8") as f:
+    gold = f.readlines()
+gold = [i.strip().split("  ") for i in gold]
+
+
+# with open("msr-test-low.utf8", "r", encoding="utf-8") as f:
+#     zh = f.readlines()
+# seg_jieba = ["  ".join(jieba.cut(i.strip(),cut_all=False)).split("  ") for i in zh]
+# with open("jieba-segmentation.json","w") as f:
+#     json.dump(seg_jieba,f, ensure_ascii=False)
+
+
+# with open("msr-test-low.utf8", "r", encoding="utf-8") as f:
+#     zh = f.readlines()
+# seg_thulac = thulac.thulac(seg_only=True)
+# seg_thulac_all = []
+# seg_thulac_all.extend([([j[0] for j in seg_thulac.cut(i.strip())]) for i in zh])
+
+
+pynlpir.open()
+with open("msr-test-low.utf8", "r", encoding="utf-8") as f:
+    zh = f.readlines()
+seg_nlpir = ["  ".join(pynlpir.segment(i.strip(),pos_tagging=False)).split("  ") for i in zh]
+
+
+correct_preds, total_correct, total_preds = 0., 0., 0.
+for seg_id, gold_id in zip(seg_sen, gold):
+    total_preds += len(seg_id)
+    total_correct += len(gold_id)
+    for seg_id_id in seg_id:
+        if seg_id_id in gold_id:
+            correct_preds += 1
+            gold_id.remove(seg_id_id)
+p = correct_preds / total_preds if correct_preds > 0 else 0
+r = correct_preds / total_correct if correct_preds > 0 else 0
+f1 = 2 * p * r / (p + r) if correct_preds > 0 else 0
+print(p, r, f1)
